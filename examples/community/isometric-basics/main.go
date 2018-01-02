@@ -15,17 +15,36 @@ const (
 	windowHeight = 800
 	// sprite tiles are squared, 64x64 size
 	tileSize = 64
-	f        = 0 // floor identifier
-	w        = 1 // wall identifier
+	e        = 0 // empty
+	f        = 1 // floor identifier
+	w        = 2 // wall identifier
 )
 
-var levelData = [][]uint{
-	{f, f, f, f, f, f}, // This row will be rendered in the lower left part of the screen (closer to the viewer)
-	{w, f, f, f, f, w},
-	{w, f, f, f, f, w},
-	{w, f, f, f, f, w},
-	{w, f, f, f, f, w},
-	{w, w, w, w, w, w}, // And this in the upper right
+var levelData = [][][]uint{
+	{
+		{w, w, w, w, w, w}, // This row will be rendered in the lower left part of the screen (closer to the viewer)
+		{w, w, w, w, w, w},
+		{w, w, w, w, w, w},
+		{w, w, w, w, w, w},
+		{w, w, w, w, w, w},
+		{w, w, w, w, w, w}, // And this in the upper right
+	},
+	{
+		{0, 0, 0, 0, 0, 0},
+		{0, w, w, w, w, 0},
+		{0, w, w, w, w, 0},
+		{0, w, w, w, w, 0},
+		{0, w, w, w, w, 0},
+		{0, 0, 0, 0, 0, 0},
+	},
+	{
+		{0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0},
+		{0, 0, w, w, 0, 0},
+		{0, 0, w, w, 0, 0},
+		{0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0},
+	},
 }
 var win *pixelgl.Window
 var offset = pixel.V(400, 325)
@@ -65,7 +84,7 @@ func run() {
 	wallTile = pixel.NewSprite(pic, pixel.R(0, 448, tileSize, 512))
 	floorTile = pixel.NewSprite(pic, pixel.R(0, 128, tileSize, 192))
 
-	depthSort()
+	levels()
 
 	for !win.Closed() {
 		win.Update()
@@ -76,20 +95,28 @@ func run() {
 // In order to achieve the depth effect, we need to render tiles up to down, being lower
 // closer to the viewer (see painter's algorithm). To do that, we need to process levelData in reverse order,
 // so its first row is rendered last, as OpenGL considers its origin to be in the lower left corner of the display.
-func depthSort() {
-	for x := len(levelData) - 1; x >= 0; x-- {
-		for y := len(levelData[x]) - 1; y >= 0; y-- {
+func depthSort(floor int) {
+	height := floor * (tileSize / 2)
+	for x := len(levelData[floor]) - 1; x >= 0; x-- {
+		for y := len(levelData[floor][x]) - 1; y >= 0; y-- {
 			isoCoords := cartesianToIso(pixel.V(float64(x), float64(y)))
+			isoCoords.Y += float64(height)
 			mat := pixel.IM.Moved(offset.Add(isoCoords))
 			// Not really needed, just put to show bigger blocks
 			mat = mat.ScaledXY(win.Bounds().Center(), pixel.V(2, 2))
-			tileType := levelData[x][y]
+			tileType := levelData[floor][x][y]
 			if tileType == f {
 				floorTile.Draw(win, mat)
-			} else {
+			} else if tileType == w {
 				wallTile.Draw(win, mat)
 			}
 		}
+	}
+}
+
+func levels() {
+	for n := 0; n < len(levelData); n++ {
+		depthSort(n)
 	}
 }
 
