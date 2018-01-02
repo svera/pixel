@@ -22,33 +22,26 @@ const (
 
 var levelData = [][][]uint{
 	{
-		{w, w, w, w, w, w}, // This row will be rendered in the lower left part of the screen (closer to the viewer)
-		{w, w, w, w, w, w},
-		{w, w, w, w, w, w},
-		{w, w, w, w, w, w},
-		{w, w, w, w, w, w},
+		{f, f, f, f, f, w}, // This row will be rendered in the lower left part of the screen (closer to the viewer)
+		{w, f, f, f, f, w},
+		{w, f, f, f, f, w},
+		{w, f, f, f, f, w},
+		{w, f, f, f, f, w},
 		{w, w, w, w, w, w}, // And this in the upper right
 	},
 	{
-		{0, 0, 0, 0, 0, 0},
-		{0, w, w, w, w, 0},
-		{0, w, w, w, w, 0},
-		{0, w, w, w, w, 0},
-		{0, w, w, w, w, 0},
-		{0, 0, 0, 0, 0, 0},
-	},
-	{
-		{0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0},
-		{0, 0, w, w, 0, 0},
-		{0, 0, w, w, 0, 0},
-		{0, 0, 0, 0, 0, 0},
-		{0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, w},
+		{w, 0, 0, 0, 0, w},
+		{w, 0, 0, 0, 0, w},
+		{w, 0, 0, 0, 0, w},
+		{w, 0, 0, 0, 0, w},
+		{w, w, w, w, w, w},
 	},
 }
 var win *pixelgl.Window
 var offset = pixel.V(400, 325)
-var floorTile, wallTile *pixel.Sprite
+var floorTile, wallTile, walkerSprite *pixel.Sprite
+var walkerCartesianPos = pixel.V(1, 1)
 
 func loadPicture(path string) (pixel.Picture, error) {
 	file, err := os.Open(path)
@@ -81,12 +74,32 @@ func run() {
 		panic(err)
 	}
 
+	walker, err := loadPicture("walker2.png")
+	if err != nil {
+		panic(err)
+	}
+
 	wallTile = pixel.NewSprite(pic, pixel.R(0, 448, tileSize, 512))
 	floorTile = pixel.NewSprite(pic, pixel.R(0, 128, tileSize, 192))
+	walkerSprite = pixel.NewSprite(walker, pixel.R(0, 0, tileSize, tileSize))
 
 	levels()
 
+	var newPos = walkerCartesianPos
 	for !win.Closed() {
+		if win.JustPressed(pixelgl.KeyUp) {
+			newPos = walkerCartesianPos.Add(pixel.V(1, 0))
+		} else if win.JustPressed(pixelgl.KeyDown) {
+			newPos = walkerCartesianPos.Sub(pixel.V(1, 0))
+		} else if win.JustPressed(pixelgl.KeyRight) {
+			newPos = walkerCartesianPos.Sub(pixel.V(0, 1))
+		} else if win.JustPressed(pixelgl.KeyLeft) {
+			newPos = walkerCartesianPos.Add(pixel.V(0, 1))
+		}
+		if isWalkable(0, newPos) {
+			walkerCartesianPos = newPos
+		}
+		levels()
 		win.Update()
 	}
 }
@@ -102,13 +115,16 @@ func depthSort(floor int) {
 			isoCoords := cartesianToIso(pixel.V(float64(x), float64(y)))
 			isoCoords.Y += float64(height)
 			mat := pixel.IM.Moved(offset.Add(isoCoords))
-			// Not really needed, just put to show bigger blocks
-			mat = mat.ScaledXY(win.Bounds().Center(), pixel.V(2, 2))
 			tileType := levelData[floor][x][y]
 			if tileType == f {
 				floorTile.Draw(win, mat)
 			} else if tileType == w {
 				wallTile.Draw(win, mat)
+			}
+			if walkerCartesianPos.X == float64(x) && walkerCartesianPos.Y == float64(y) && floor == 0 {
+				walkerIsoCoords := cartesianToIso(walkerCartesianPos)
+				mat = pixel.IM.Moved(offset.Add(walkerIsoCoords))
+				walkerSprite.Draw(win, mat)
 			}
 		}
 	}
@@ -118,6 +134,16 @@ func levels() {
 	for n := 0; n < len(levelData); n++ {
 		depthSort(n)
 	}
+}
+
+func isWalkable(floor uint, pos pixel.Vec) bool {
+	if pos.X < 0 || pos.Y < 0 {
+		return false
+	}
+	if levelData[floor][uint(pos.X)][uint(pos.Y)] != w {
+		return true
+	}
+	return false
 }
 
 func cartesianToIso(pt pixel.Vec) pixel.Vec {
