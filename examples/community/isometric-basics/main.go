@@ -44,7 +44,7 @@ var win *pixelgl.Window
 var offset = pixel.V(400, 325)
 var floorTile, wallTile, walkerSprite *pixel.Sprite
 var walkerCartesianPos = pixel.V(1, 1)
-var walkerD = pixel.V(0, 0)
+var walkerIsoPos = pixel.V(0, 0)
 
 var movementMode = 1
 
@@ -74,6 +74,7 @@ func run() {
 	floorTile = pixel.NewSprite(pic, pixel.R(0, 128, tileSize, 192))
 	walkerSprite = pixel.NewSprite(walker, pixel.R(0, 0, tileSize, tileSize))
 
+	renderAllFloors()
 	last := time.Now()
 	for !win.Closed() {
 		dt := time.Since(last).Seconds()
@@ -81,28 +82,44 @@ func run() {
 		last = time.Now()
 		v := pixel.V(0, 0)
 
-		if win.JustPressed(pixelgl.KeyTab) {
-			movementMode = 1 - movementMode
+		if win.Pressed(pixelgl.KeyW) {
+			v.Y = d
+			offset = offset.Add(v)
+		}
+		if win.Pressed(pixelgl.KeyS) {
+			v.Y = -d
+			offset = offset.Add(v)
+		}
+		if win.Pressed(pixelgl.KeyD) {
+			v.X = d
+			offset = offset.Add(v)
+		}
+		if win.Pressed(pixelgl.KeyA) {
+			v.X = -d
+			offset = offset.Add(v)
 		}
 		if win.Pressed(pixelgl.KeyUp) {
-			v = v.Add(pixel.V(0, d))
+			v.Y = d
+			walkerIsoPos = walkerIsoPos.Add(v)
 		}
 		if win.Pressed(pixelgl.KeyDown) {
-			v = v.Add(pixel.V(0, -d))
+			v.Y = -d
+			walkerIsoPos = walkerIsoPos.Add(v)
 		}
 		if win.Pressed(pixelgl.KeyRight) {
-			v = v.Add(pixel.V(d, 0))
+			v.X = d
+			walkerIsoPos = walkerIsoPos.Add(v)
 		}
 		if win.Pressed(pixelgl.KeyLeft) {
-			v = v.Add(pixel.V(-d, 0))
+			v.X = -d
+			walkerIsoPos = walkerIsoPos.Add(v)
 		}
 
-		if movementMode == 1 {
-			offset = offset.Add(v)
-		} else {
-			walkerD = walkerD.Add(v)
+		// Check if screen must be re-rendered
+		if v.X != 0 || v.Y != 0 {
+			renderAllFloors()
 		}
-		renderAllFloors()
+
 		win.Update()
 	}
 }
@@ -125,7 +142,7 @@ func renderFloor(floor int) {
 				wallTile.Draw(win, mat)
 			}
 			if walkerCartesianPos.X == float64(x) && walkerCartesianPos.Y == float64(y) && floor == 0 {
-				walkerSprite.Draw(win, mat.Moved(walkerD))
+				walkerSprite.Draw(win, mat.Moved(walkerIsoPos))
 			}
 		}
 	}
@@ -140,6 +157,12 @@ func renderAllFloors() {
 
 func cartesianToIso(pt pixel.Vec) pixel.Vec {
 	return pixel.V((pt.X-pt.Y)*(tileSize/2), (pt.X+pt.Y)*(tileSize/4))
+}
+
+func isoToCartesian(pt pixel.Vec) pixel.Vec {
+	x := (pt.X/(tileSize/2) + pt.Y/(tileSize/4)) / 2
+	y := (pt.Y/(tileSize/4) - (pt.X / (tileSize / 2))) / 2
+	return pixel.V(x, y)
 }
 
 func main() {
